@@ -767,6 +767,91 @@
       visibility: visible;
     }
     
+    /* Data Management Panel */
+    .data-panel {
+      position: fixed;
+      left: -400px;
+      top: 0;
+      width: 350px;
+      height: 100%;
+      background: white;
+      box-shadow: var(--shadow-lg);
+      z-index: 200;
+      transition: left 0.3s ease;
+      padding: 2rem;
+      overflow-y: auto;
+    }
+    
+    .data-panel.open {
+      left: 0;
+    }
+    
+    .data-panel h3 {
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .data-action {
+      padding: 1rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .data-action:hover {
+      border-color: var(--accent);
+      background: #f8fafc;
+    }
+    
+    .data-action i {
+      font-size: 1.25rem;
+      color: var(--accent);
+    }
+    
+    .data-action.danger i {
+      color: #ef4444;
+    }
+    
+    .data-action.danger:hover {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+      background: #f8fafc;
+      padding: 1rem;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+    
+    .stat-number {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    
+    .stat-label {
+      font-size: 0.75rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
     /* Image Upload Progress */
     .upload-progress {
       position: absolute;
@@ -793,6 +878,7 @@
       color: #64748b;
       transition: var(--transition);
       margin: 1rem 0;
+      cursor: pointer;
     }
     
     .drop-zone.drag-over {
@@ -804,6 +890,36 @@
       font-size: 2rem;
       margin-bottom: 0.5rem;
       color: var(--accent);
+    }
+    
+    /* Auto-save indicator */
+    .auto-save-status {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: var(--dark-bg);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 99;
+    }
+    
+    .auto-save-status.show {
+      opacity: 1;
+    }
+    
+    .auto-save-status.saving {
+      color: var(--accent);
+    }
+    
+    .auto-save-status.saved {
+      color: #22c55e;
     }
     
     /* Responsive */
@@ -848,9 +964,22 @@
         width: 100%;
       }
       
-      .drafts-panel {
+      .drafts-panel, .data-panel {
         width: 100%;
         right: -100%;
+        left: auto;
+      }
+      
+      .data-panel {
+        left: -100%;
+      }
+      
+      .drafts-panel.open {
+        right: 0;
+      }
+      
+      .data-panel.open {
+        left: 0;
       }
     }
     
@@ -884,11 +1013,18 @@
   <nav>
     <button onclick="toggleEditor()"><i class="fas fa-plus"></i> New Post</button>
     <button onclick="toggleDrafts()"><i class="fas fa-file-alt"></i> Drafts <span id="draftCount" class="hidden" style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.75rem;">0</span></button>
+    <button onclick="toggleDataPanel()"><i class="fas fa-database"></i> Data</button>
     <button onclick="shareSite()"><i class="fas fa-share-alt"></i> Share</button>
     <button onclick="document.getElementById('subscribe').scrollIntoView({behavior: 'smooth'})">
       <i class="fas fa-envelope"></i> Subscribe
     </button>
   </nav>
+
+  <!-- Auto-save Status Indicator -->
+  <div class="auto-save-status" id="autoSaveStatus">
+    <i class="fas fa-circle-notch fa-spin"></i>
+    <span>Saving...</span>
+  </div>
 
   <section id="editor" class="hidden">
     <h2><i class="fas fa-pen-fancy"></i> Create Your Story</h2>
@@ -896,14 +1032,14 @@
     
     <div class="toolbar">
       <div class="toolbar-group">
-        <select id="fontSelector" onchange="updatePreview()">
+        <select id="fontSelector" onchange="updatePreview(); autoSave();">
           <option value="'Segoe UI', system-ui, sans-serif">System Font</option>
           <option value="Georgia, serif">Serif</option>
           <option value="'Courier New', monospace">Monospace</option>
           <option value="'Playfair Display', serif">Playfair</option>
         </select>
         
-        <select id="textSize" onchange="updatePreview()">
+        <select id="textSize" onchange="updatePreview(); autoSave();">
           <option value="1rem">Normal</option>
           <option value="1.125rem">Large</option>
           <option value="1.25rem">Extra Large</option>
@@ -996,6 +1132,52 @@
     <div id="draftsList"></div>
   </div>
 
+  <!-- Data Management Panel -->
+  <div class="overlay" onclick="toggleDataPanel()" id="dataOverlay"></div>
+  <div class="data-panel" id="dataPanel">
+    <h3>
+      <span><i class="fas fa-database"></i> Data Management</span>
+      <button class="close-btn" onclick="toggleDataPanel()"><i class="fas fa-times"></i></button>
+    </h3>
+    
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-number" id="statPosts">0</div>
+        <div class="stat-label">Published</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="statDrafts">0</div>
+        <div class="stat-label">Drafts</div>
+      </div>
+    </div>
+    
+    <div class="data-action" onclick="exportAllData()">
+      <i class="fas fa-download"></i>
+      <div>
+        <strong>Export All Data</strong>
+        <p style="font-size: 0.75rem; color: #64748b; margin: 0;">Download JSON backup</p>
+      </div>
+    </div>
+    
+    <div class="data-action" onclick="importData()">
+      <i class="fas fa-upload"></i>
+      <div>
+        <strong>Import Data</strong>
+        <p style="font-size: 0.75rem; color: #64748b; margin: 0;">Restore from backup</p>
+      </div>
+    </div>
+    
+    <div class="data-action danger" onclick="clearAllData()">
+      <i class="fas fa-trash-alt"></i>
+      <div>
+        <strong>Clear All Data</strong>
+        <p style="font-size: 0.75rem; color: #64748b; margin: 0;">Delete everything</p>
+      </div>
+    </div>
+    
+    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="handleImport(event)">
+  </div>
+
   <!-- Modal -->
   <div class="modal-overlay" id="modal">
     <div class="modal">
@@ -1015,27 +1197,242 @@
   </div>
 
   <script>
-    // State Management
-    let drafts = JSON.parse(localStorage.getItem('echoVerseDrafts')) || [];
+    // ==========================================
+    // LOCAL STORAGE KEYS
+    // ==========================================
+    const STORAGE_KEYS = {
+      POSTS: 'echoVerse_posts',
+      DRAFTS: 'echoVerse_drafts',
+      EDITOR_STATE: 'echoVerse_editor_state',
+      SETTINGS: 'echoVerse_settings'
+    };
+
+    // ==========================================
+    // STATE MANAGEMENT
+    // ==========================================
+    let posts = [];
+    let drafts = [];
     let currentEditingId = null;
     let modalCallback = null;
+    let autoSaveTimer = null;
 
-    // Initialize
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
     document.addEventListener('DOMContentLoaded', () => {
-      updateDraftCount();
-      loadSamplePosts();
+      loadAllData();
+      setupEventListeners();
       setupDragAndDrop();
       setupFileInput();
+      setupAutoSave();
+      updateStats();
       
       // Auto-resize editor
       const editor = document.getElementById('postContent');
       editor.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.max(300, this.scrollHeight) + 'px';
+        autoSave();
       });
     });
 
-    // Setup File Input - FIXED VERSION
+    // ==========================================
+    // DATA PERSISTENCE FUNCTIONS
+    // ==========================================
+    
+    function loadAllData() {
+      // Load published posts
+      const savedPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
+      if (savedPosts) {
+        posts = JSON.parse(savedPosts);
+        renderPosts();
+      } else {
+        // Load sample posts on first visit
+        loadSamplePosts();
+        savePosts();
+      }
+      
+      // Load drafts
+      const savedDrafts = localStorage.getItem(STORAGE_KEYS.DRAFTS);
+      if (savedDrafts) {
+        drafts = JSON.parse(savedDrafts);
+        updateDraftCount();
+      }
+      
+      // Restore editor state if exists
+      restoreEditorState();
+    }
+
+    function savePosts() {
+      localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(posts));
+      updateStats();
+    }
+
+    function saveDrafts() {
+      localStorage.setItem(STORAGE_KEYS.DRAFTS, JSON.stringify(drafts));
+      updateDraftCount();
+      updateStats();
+    }
+
+    function saveEditorState() {
+      const state = {
+        title: document.getElementById("postTitle").value,
+        content: document.getElementById("postContent").innerHTML,
+        font: document.getElementById("fontSelector").value,
+        size: document.getElementById("textSize").value,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(state));
+    }
+
+    function restoreEditorState() {
+      const saved = localStorage.getItem(STORAGE_KEYS.EDITOR_STATE);
+      if (!saved) return;
+      
+      const state = JSON.parse(saved);
+      
+      // Only restore if editor has content and editor is not currently showing a draft
+      if (state.title || state.content) {
+        document.getElementById("postTitle").value = state.title || '';
+        document.getElementById("postContent").innerHTML = state.content || '';
+        
+        if (state.font) document.getElementById("fontSelector").value = state.font;
+        if (state.size) document.getElementById("textSize").value = state.size;
+        
+        updatePreview();
+        
+        // Show restore notification if there was unsaved work
+        if (state.title || state.content.trim()) {
+          showToast('Restored your previous work', 'success');
+          document.getElementById("editor").classList.remove("hidden");
+        }
+      }
+    }
+
+    function clearEditorState() {
+      localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE);
+    }
+
+    // ==========================================
+    // AUTO-SAVE FUNCTIONALITY
+    // ==========================================
+    
+    function setupAutoSave() {
+      // Auto-save on input changes
+      const titleInput = document.getElementById("postTitle");
+      const contentEditor = document.getElementById("postContent");
+      
+      titleInput.addEventListener('input', () => {
+        autoSave();
+      });
+      
+      contentEditor.addEventListener('input', () => {
+        autoSave();
+      });
+    }
+
+    function autoSave() {
+      // Show saving indicator
+      const indicator = document.getElementById("autoSaveStatus");
+      indicator.classList.add("show", "saving");
+      indicator.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>Saving...</span>';
+      
+      // Clear existing timer
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      
+      // Set new timer to save after 1 second of inactivity
+      autoSaveTimer = setTimeout(() => {
+        saveEditorState();
+        indicator.classList.remove("saving");
+        indicator.classList.add("saved");
+        indicator.innerHTML = '<i class="fas fa-check"></i><span>Saved</span>';
+        
+        // Hide after 2 seconds
+        setTimeout(() => {
+          indicator.classList.remove("show", "saved");
+        }, 2000);
+      }, 1000);
+    }
+
+    // ==========================================
+    // EDITOR FUNCTIONS
+    // ==========================================
+    
+    function toggleEditor() {
+      const editor = document.getElementById("editor");
+      const isHidden = editor.classList.contains("hidden");
+      
+      if (isHidden) {
+        editor.classList.remove("hidden");
+        setTimeout(() => document.getElementById("postTitle").focus(), 100);
+      } else {
+        editor.classList.add("hidden");
+        // Don't clear editor when closing - auto-save preserves it
+      }
+    }
+
+    function resetEditor() {
+      document.getElementById("postTitle").value = "";
+      document.getElementById("postContent").innerHTML = "";
+      currentEditingId = null;
+      clearEditorState();
+    }
+
+    function clearEditor() {
+      if (confirm("Are you sure you want to clear the editor? This cannot be undone.")) {
+        resetEditor();
+        showToast("Editor cleared");
+      }
+    }
+
+    function updatePreview() {
+      const font = document.getElementById("fontSelector").value;
+      const size = document.getElementById("textSize").value;
+      const editor = document.getElementById("postContent");
+      editor.style.fontFamily = font;
+      editor.style.fontSize = size;
+    }
+
+    // ==========================================
+    // FORMATTING FUNCTIONS
+    // ==========================================
+    
+    function formatText(command) {
+      document.execCommand(command, false, null);
+      document.getElementById("postContent").focus();
+      autoSave();
+    }
+
+    function insertHeading() {
+      const level = prompt("Enter heading level (1-6):", "2");
+      if (level >= 1 && level <= 6) {
+        document.execCommand("formatBlock", false, `h${level}`);
+        autoSave();
+      }
+    }
+
+    function insertList(type) {
+      document.execCommand(type === 'ul' ? "insertUnorderedList" : "insertOrderedList");
+      autoSave();
+    }
+
+    function insertQuote() {
+      document.execCommand("formatBlock", false, "blockquote");
+      autoSave();
+    }
+
+    function insertLink() {
+      const url = prompt("Enter URL:", "https://");
+      if (url) {
+        document.execCommand("createLink", false, url);
+        autoSave();
+      }
+    }
+
+    // ==========================================
+    // MEDIA HANDLING
+    // ==========================================
+    
     function setupFileInput() {
       const input = document.getElementById('mediaInput');
       
@@ -1044,21 +1441,16 @@
         if (!file) return;
         
         handleFileUpload(file);
-        
-        // Reset input so same file can be selected again
         this.value = '';
       });
     }
 
-    // Handle File Upload
     function handleFileUpload(file) {
-      // Validate file type
       if (!file.type.match(/^(image|video)\//)) {
         showToast('Please select an image or video file', 'error');
         return;
       }
       
-      // Validate file size (10MB limit)
       if (file.size > 10 * 1024 * 1024) {
         showToast('File size must be less than 10MB', 'error');
         return;
@@ -1077,7 +1469,6 @@
       reader.readAsDataURL(file);
     }
 
-    // Insert Media into Editor
     function insertMediaIntoEditor(dataUrl, mimeType) {
       const isImage = mimeType.startsWith('image/');
       const isVideo = mimeType.startsWith('video/');
@@ -1087,7 +1478,6 @@
         return;
       }
       
-      // Create media HTML
       let mediaHtml;
       if (isImage) {
         mediaHtml = `
@@ -1147,33 +1537,27 @@
         `;
       }
       
-      // Insert at cursor position or append
       const editor = document.getElementById('postContent');
       editor.focus();
-      
-      // Use execCommand for better compatibility
       document.execCommand('insertHTML', false, mediaHtml);
+      autoSave();
       
       showToast(`${isImage ? 'Image' : 'Video'} inserted successfully`);
     }
 
-    // Update Media Size
     function updateMediaSize(select) {
       const container = select.closest('.media-container');
       const media = container.querySelector('img, video');
-      const width = select.value;
-      
-      media.style.width = width;
-      media.style.maxWidth = width;
+      media.style.width = select.value;
+      media.style.maxWidth = select.value;
+      autoSave();
     }
 
-    // Update Media Alignment
     function updateMediaAlign(select) {
       const container = select.closest('.media-container');
       const media = container.querySelector('img, video');
       const align = select.value;
       
-      // Reset styles
       media.style.float = 'none';
       media.style.margin = '0 auto';
       media.style.display = 'block';
@@ -1184,30 +1568,24 @@
       } else if (align === 'right') {
         media.style.float = 'right';
         media.style.margin = '0 0 20px 20px';
-      } else {
-        media.style.margin = '0 auto';
       }
+      autoSave();
     }
 
-    // Remove Media
     function removeMedia(btn) {
-      const container = btn.closest('.media-container');
-      container.remove();
+      btn.closest('.media-container').remove();
+      autoSave();
       showToast('Media removed');
     }
 
-    // Drag and Drop Setup
     function setupDragAndDrop() {
       const dropZone = document.getElementById('dropZone');
-      const editor = document.getElementById('editor');
       
-      // Prevent default drag behaviors
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
         document.body.addEventListener(eventName, preventDefaults, false);
       });
       
-      // Highlight drop zone
       ['dragenter', 'dragover'].forEach(eventName => {
         dropZone.addEventListener(eventName, highlight, false);
       });
@@ -1216,7 +1594,6 @@
         dropZone.addEventListener(eventName, unhighlight, false);
       });
       
-      // Handle drop
       dropZone.addEventListener('drop', handleDrop, false);
       
       function preventDefaults(e) {
@@ -1242,75 +1619,14 @@
       }
     }
 
-    // Trigger File Input
     function insertMedia() {
       document.getElementById('mediaInput').click();
     }
 
-    // Editor Functions
-    function toggleEditor() {
-      const editor = document.getElementById("editor");
-      const isHidden = editor.classList.contains("hidden");
-      
-      if (isHidden) {
-        editor.classList.remove("hidden");
-        setTimeout(() => document.getElementById("postTitle").focus(), 100);
-      } else {
-        editor.classList.add("hidden");
-        resetEditor();
-      }
-    }
-
-    function resetEditor() {
-      document.getElementById("postTitle").value = "";
-      document.getElementById("postContent").innerHTML = "";
-      currentEditingId = null;
-    }
-
-    function clearEditor() {
-      if (confirm("Are you sure you want to clear the editor?")) {
-        resetEditor();
-        showToast("Editor cleared");
-      }
-    }
-
-    function updatePreview() {
-      const font = document.getElementById("fontSelector").value;
-      const size = document.getElementById("textSize").value;
-      const editor = document.getElementById("postContent");
-      editor.style.fontFamily = font;
-      editor.style.fontSize = size;
-    }
-
-    // Formatting Functions
-    function formatText(command) {
-      document.execCommand(command, false, null);
-      document.getElementById("postContent").focus();
-    }
-
-    function insertHeading() {
-      const level = prompt("Enter heading level (1-6):", "2");
-      if (level >= 1 && level <= 6) {
-        document.execCommand("formatBlock", false, `h${level}`);
-      }
-    }
-
-    function insertList(type) {
-      document.execCommand(type === 'ul' ? "insertUnorderedList" : "insertOrderedList");
-    }
-
-    function insertQuote() {
-      document.execCommand("formatBlock", false, "blockquote");
-    }
-
-    function insertLink() {
-      const url = prompt("Enter URL:", "https://");
-      if (url) {
-        document.execCommand("createLink", false, url);
-      }
-    }
-
-    // Drafts Management
+    // ==========================================
+    // DRAFTS MANAGEMENT
+    // ==========================================
+    
     function saveDraft() {
       const title = document.getElementById("postTitle").value.trim();
       const content = document.getElementById("postContent").innerHTML;
@@ -1334,15 +1650,14 @@
         drafts.unshift(draft);
       }
       
-      localStorage.setItem('echoVerseDrafts', JSON.stringify(drafts));
-      updateDraftCount();
-      showToast("Draft saved successfully");
+      saveDrafts();
       currentEditingId = draft.id;
+      showToast("Draft saved successfully");
     }
 
     function toggleDrafts() {
       const panel = document.getElementById("draftsPanel");
-      const overlay = document.querySelector(".overlay");
+      const overlay = document.querySelector(".overlay:not(#dataOverlay)");
       
       panel.classList.toggle("open");
       overlay.classList.toggle("active");
@@ -1381,14 +1696,14 @@
       
       toggleDrafts();
       document.getElementById("editor").classList.remove("hidden");
+      updatePreview();
       showToast("Draft loaded");
     }
 
     function deleteDraft(id) {
       if (!confirm("Delete this draft?")) return;
       drafts = drafts.filter(d => d.id !== id);
-      localStorage.setItem('echoVerseDrafts', JSON.stringify(drafts));
-      updateDraftCount();
+      saveDrafts();
       renderDrafts();
       showToast("Draft deleted");
     }
@@ -1403,7 +1718,10 @@
       }
     }
 
-    // Publishing
+    // ==========================================
+    // PUBLISHING
+    // ==========================================
+    
     function publishPost() {
       const title = document.getElementById("postTitle").value.trim();
       const content = document.getElementById("postContent").innerHTML;
@@ -1416,26 +1734,25 @@
       }
       
       openModal("Enter your name:", "Anonymous", (author) => {
-        const post = createPostElement({
+        const post = {
+          id: Date.now(),
           title,
           content,
           author,
-          date: new Date(),
+          date: new Date().toISOString(),
           font,
-          size
-        });
+          size,
+          likes: 0
+        };
         
-        const container = document.getElementById("postsContainer");
-        const emptyState = container.querySelector(".empty-state");
-        if (emptyState) emptyState.remove();
-        
-        container.insertBefore(post, container.firstChild);
+        posts.unshift(post);
+        savePosts();
+        renderPosts();
         
         // Remove from drafts if it was one
         if (currentEditingId) {
           drafts = drafts.filter(d => d.id !== currentEditingId);
-          localStorage.setItem('echoVerseDrafts', JSON.stringify(drafts));
-          updateDraftCount();
+          saveDrafts();
         }
         
         resetEditor();
@@ -1444,52 +1761,204 @@
       });
     }
 
-    function createPostElement({title, content, author, date, font, size}) {
-      const div = document.createElement("div");
-      div.className = "post";
-      div.style.fontFamily = font;
-      div.style.fontSize = size;
+    function renderPosts() {
+      const container = document.getElementById("postsContainer");
       
+      if (posts.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <i class="fas fa-feather-alt"></i>
+            <h3>No stories yet</h3>
+            <p>Be the first to share your voice with the world. Click "New Post" to begin.</p>
+          </div>
+        `;
+        return;
+      }
+      
+      container.innerHTML = posts.map(post => createPostHTML(post)).join('');
+    }
+
+    function createPostHTML(post) {
+      const date = new Date(post.date);
       const formattedDate = date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
       
-      div.innerHTML = `
-        <h3>${title}</h3>
-        <div class="post-meta">
-          <span><i class="far fa-calendar-alt"></i> ${formattedDate}</span>
-          <span><i class="far fa-user"></i> ${author}</span>
-          <span><i class="far fa-clock"></i> ${Math.ceil(stripHtml(content).split(' ').length / 200)} min read</span>
-        </div>
-        <div class="post-content">${content}</div>
-        <div class="post-actions">
-          <button onclick="likePost(this)"><i class="far fa-heart"></i> <span class="count">0</span> Likes</button>
-          <button onclick="sharePost('${title}')"><i class="fas fa-share"></i> Share</button>
-          <button onclick="this.closest('.post').remove(); showToast('Post deleted')"><i class="fas fa-trash"></i> Delete</button>
+      const readTime = Math.ceil(stripHtml(post.content).split(' ').length / 200);
+      
+      return `
+        <div class="post" data-id="${post.id}" style="font-family: ${post.font || "'Segoe UI', system-ui, sans-serif"}; font-size: ${post.size || '1rem'}">
+          <h3>${post.title}</h3>
+          <div class="post-meta">
+            <span><i class="far fa-calendar-alt"></i> ${formattedDate}</span>
+            <span><i class="far fa-user"></i> ${post.author}</span>
+            <span><i class="far fa-clock"></i> ${readTime} min read</span>
+          </div>
+          <div class="post-content">${post.content}</div>
+          <div class="post-actions">
+            <button onclick="likePost(this, ${post.id})">
+              <i class="far fa-heart"></i> 
+              <span class="count">${post.likes || 0}</span> Likes
+            </button>
+            <button onclick="sharePost('${post.title}')"><i class="fas fa-share"></i> Share</button>
+            <button onclick="editPost(${post.id})"><i class="fas fa-edit"></i> Edit</button>
+            <button onclick="deletePost(${post.id})"><i class="fas fa-trash"></i> Delete</button>
+          </div>
         </div>
       `;
-      
-      return div;
     }
 
-    function likePost(btn) {
+    function likePost(btn, id) {
+      const post = posts.find(p => p.id === id);
+      if (!post) return;
+      
       const icon = btn.querySelector("i");
       const count = btn.querySelector(".count");
       
       if (icon.classList.contains("far")) {
         icon.classList.replace("far", "fas");
         icon.style.color = "#ef4444";
-        count.textContent = parseInt(count.textContent) + 1;
+        post.likes = (post.likes || 0) + 1;
       } else {
         icon.classList.replace("fas", "far");
         icon.style.color = "";
-        count.textContent = parseInt(count.textContent) - 1;
+        post.likes = Math.max(0, (post.likes || 0) - 1);
       }
+      
+      count.textContent = post.likes;
+      savePosts();
     }
 
-    // Sharing
+    function editPost(id) {
+      const post = posts.find(p => p.id === id);
+      if (!post) return;
+      
+      // Load into editor
+      document.getElementById("postTitle").value = post.title;
+      document.getElementById("postContent").innerHTML = post.content;
+      document.getElementById("fontSelector").value = post.font || "'Segoe UI', system-ui, sans-serif";
+      document.getElementById("textSize").value = post.size || "1rem";
+      
+      currentEditingId = null; // Not a draft, it's a published post
+      updatePreview();
+      
+      // Remove old post
+      posts = posts.filter(p => p.id !== id);
+      savePosts();
+      renderPosts();
+      
+      // Show editor
+      document.getElementById("editor").classList.remove("hidden");
+      showToast("Post loaded for editing");
+    }
+
+    function deletePost(id) {
+      if (!confirm("Delete this post permanently?")) return;
+      posts = posts.filter(p => p.id !== id);
+      savePosts();
+      renderPosts();
+      showToast("Post deleted");
+    }
+
+    // ==========================================
+    // DATA MANAGEMENT PANEL
+    // ==========================================
+    
+    function toggleDataPanel() {
+      const panel = document.getElementById("dataPanel");
+      const overlay = document.getElementById("dataOverlay");
+      
+      panel.classList.toggle("open");
+      overlay.classList.toggle("active");
+      updateStats();
+    }
+
+    function updateStats() {
+      document.getElementById("statPosts").textContent = posts.length;
+      document.getElementById("statDrafts").textContent = drafts.length;
+    }
+
+    function exportAllData() {
+      const data = {
+        posts,
+        drafts,
+        exportDate: new Date().toISOString(),
+        version: "1.0"
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `echoverse-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast("Data exported successfully");
+    }
+
+    function importData() {
+      document.getElementById("importFile").click();
+    }
+
+    function handleImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          if (data.posts && Array.isArray(data.posts)) {
+            posts = data.posts;
+            savePosts();
+            renderPosts();
+          }
+          
+          if (data.drafts && Array.isArray(data.drafts)) {
+            drafts = data.drafts;
+            saveDrafts();
+          }
+          
+          updateStats();
+          showToast("Data imported successfully");
+          toggleDataPanel();
+        } catch (err) {
+          showToast("Invalid backup file", "error");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function clearAllData() {
+      if (!confirm("WARNING: This will delete ALL posts and drafts permanently. Are you sure?")) return;
+      if (!confirm("This action cannot be undone. Click OK to proceed.")) return;
+      
+      posts = [];
+      drafts = [];
+      localStorage.removeItem(STORAGE_KEYS.POSTS);
+      localStorage.removeItem(STORAGE_KEYS.DRAFTS);
+      localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE);
+      
+      renderPosts();
+      updateDraftCount();
+      updateStats();
+      resetEditor();
+      
+      showToast("All data cleared");
+      toggleDataPanel();
+    }
+
+    // ==========================================
+    // SHARING
+    // ==========================================
+    
     function shareSite() {
       const url = window.location.href;
       const text = "Check out EchoVerse - where voices create ripples!";
@@ -1527,13 +1996,15 @@
       window.open(shareUrl, '_blank', 'width=600,height=400');
     }
 
-    // Subscription
+    // ==========================================
+    // SUBSCRIPTION
+    // ==========================================
+    
     function subscribe(e) {
       e.preventDefault();
       const email = document.getElementById("emailInput").value;
       const msg = document.getElementById("subscribeMsg");
       
-      // Simulate API call
       const btn = e.target.querySelector("button");
       const originalText = btn.innerHTML;
       btn.innerHTML = '<span class="spinner"></span>';
@@ -1550,7 +2021,10 @@
       }, 1500);
     }
 
-    // Modal System
+    // ==========================================
+    // MODAL SYSTEM
+    // ==========================================
+    
     function openModal(title, defaultValue, callback) {
       document.getElementById("modalTitle").textContent = title;
       document.getElementById("modalInput").value = defaultValue;
@@ -1570,7 +2044,10 @@
       closeModal();
     }
 
-    // Toast System
+    // ==========================================
+    // TOAST SYSTEM
+    // ==========================================
+    
     function showToast(message, type = "success") {
       const toast = document.getElementById("toast");
       const msg = document.getElementById("toastMsg");
@@ -1584,7 +2061,10 @@
       setTimeout(() => toast.classList.remove("show"), 3000);
     }
 
-    // Utilities
+    // ==========================================
+    // UTILITIES
+    // ==========================================
+    
     function stripHtml(html) {
       const tmp = document.createElement("div");
       tmp.innerHTML = html;
@@ -1592,21 +2072,58 @@
     }
 
     function copyToClipboard(text) {
-      const input = document.createElement("input");
-      input.value = text;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      document.body.removeChild(input);
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const input = document.createElement("input");
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
     }
 
-    // Sample Posts
+    function setupEventListeners() {
+      // Keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === 's') {
+            e.preventDefault();
+            if (!document.getElementById("editor").classList.contains("hidden")) {
+              saveDraft();
+            }
+          }
+          if (e.key === 'Enter' && document.getElementById("modal").classList.contains("active")) {
+            modalConfirm();
+          }
+        }
+        if (e.key === 'Escape') {
+          closeModal();
+          if (document.getElementById("draftsPanel").classList.contains("open")) {
+            toggleDrafts();
+          }
+          if (document.getElementById("dataPanel").classList.contains("open")) {
+            toggleDataPanel();
+          }
+        }
+      });
+    }
+
+    // ==========================================
+    // SAMPLE POSTS (First Visit Only)
+    // ==========================================
+    
     function loadSamplePosts() {
-      const samples = [
+      posts = [
         {
+          id: 1,
           title: "The Art of Mindful Writing",
           author: "Sarah Chen",
-          date: new Date(2025, 2, 10),
+          date: new Date(2025, 2, 10).toISOString(),
+          font: "'Segoe UI', system-ui, sans-serif",
+          size: "1rem",
+          likes: 12,
           content: `
             <p>In a world of constant notifications and endless scrolling, finding the mental space to write has become a revolutionary act. Mindful writing isn't just about putting words on paper—it's about creating a sacred space for your thoughts to breathe.</p>
             <div class="media-container" contenteditable="false">
@@ -1618,9 +2135,13 @@
           `
         },
         {
+          id: 2,
           title: "Chasing Light: A Photographer's Journey",
           author: "Marcus Rivera",
-          date: new Date(2025, 2, 5),
+          date: new Date(2025, 2, 5).toISOString(),
+          font: "'Segoe UI', system-ui, sans-serif",
+          size: "1rem",
+          likes: 8,
           content: `
             <p>Photography taught me to see the extraordinary in the ordinary. That golden hour light filtering through kitchen windows, the way rain transforms city streets into mirrors—beauty is everywhere if you train your eyes to find it.</p>
             <div class="media-container" contenteditable="false">
@@ -1636,116 +2157,7 @@
           `
         }
       ];
-      
-      const container = document.getElementById("postsContainer");
-      container.innerHTML = "";
-      
-      samples.forEach(post => {
-        container.appendChild(createPostElement({
-          ...post,
-          font: "'Segoe UI', system-ui, sans-serif",
-          size: "1rem"
-        }));
-      });
     }
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 's') {
-          e.preventDefault();
-          if (!document.getElementById("editor").classList.contains("hidden")) {
-            saveDraft();
-          }
-        }
-        if (e.key === 'Enter' && document.getElementById("modal").classList.contains("active")) {
-          modalConfirm();
-        }
-      }
-      if (e.key === 'Escape') {
-        closeModal();
-        if (document.getElementById("draftsPanel").classList.contains("open")) {
-          toggleDrafts();
-        }
-      }
-    });
-// Save data to localStorage
-function saveToLocalStorage(key, value) {
-    try {
-        // Convert objects to JSON strings
-        if (typeof value === 'object') {
-            value = JSON.stringify(value);
-        }
-        localStorage.setItem(key, value);
-        console.log(`Data saved successfully with key: ${key}`);
-        return true;
-    } catch (error) {
-        console.error('Error saving to localStorage:', error);
-        return false;
-    }
-}
-
-// Get data from localStorage
-function getFromLocalStorage(key) {
-    try {
-        const value = localStorage.getItem(key);
-        // Try to parse JSON if possible
-        try {
-            return JSON.parse(value);
-        } catch {
-            return value;
-        }
-    } catch (error) {
-        console.error('Error reading from localStorage:', error);
-        return null;
-    }
-}
-
-// Remove data from localStorage
-function removeFromLocalStorage(key) {
-    try {
-        localStorage.removeItem(key);
-        console.log(`Data removed successfully with key: ${key}`);
-        return true;
-    } catch (error) {
-        console.error('Error removing from localStorage:', error);
-        return false;
-    }
-}
-
-// Clear all localStorage data
-function clearLocalStorage() {
-    try {
-        localStorage.clear();
-        console.log('All localStorage data cleared');
-        return true;
-    } catch (error) {
-        console.error('Error clearing localStorage:', error);
-        return false;
-    }
-}
-
-// Get all localStorage keys
-function getAllLocalStorageKeys() {
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        keys.push(localStorage.key(i));
-    }
-    return keys;
-}
-
-// Example usage
-// Save user preferences
-const userPrefs = {
-    theme: 'dark',
-    fontSize: '16px',
-    notifications: true
-};
-saveToLocalStorage('userPreferences', userPrefs);
-
-// Retrieve user preferences
-const savedPrefs = getFromLocalStorage('userPreferences');
-console.log(savedPrefs);
   </script>
 </body>
 </html>
